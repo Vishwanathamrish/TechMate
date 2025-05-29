@@ -1,0 +1,844 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Professor Bot</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f0f0f0; }
+        #chat-container { max-width: 600px; margin: auto; border: 1px solid #ccc; padding: 20px; background: white; border-radius: 10px; }
+        #chat-output { height: 400px; overflow-y: scroll; border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; }
+        .message { margin: 5px 0; padding: 10px; border-radius: 5px; }
+        .user { background-color: #e6f3ff; text-align: right; }
+        .bot { background-color: #f0fff0; }
+        #input-container { display: flex; align-items: center; margin: 5px 0; }
+        #action-select { margin-right: 10px; padding: 8px; }
+        #user-input { flex-grow: 1; padding: 8px; }
+        #user-input-file { flex-grow: 1; padding: 8px; display: none; }
+        button { margin: 5px; padding: 8px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background-color: #45a049; }
+        button:disabled { background-color: #cccccc; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <div id="chat-container">
+        <h2>Professor Bot</h2>
+        <div id="chat-output">
+            <div class="message bot">Please select an action and provide input to get started (e.g., upload a PDF, create a PPT, or ask a doubt).</div>
+        </div>
+        <div id="input-container">
+            <select id="action-select" onchange="toggleInputType()">
+                <option value="upload">Upload PDF</option>
+                <option value="ppt" disabled>Create PPT</option>
+                <option value="doubt" disabled>Ask Doubt</option>
+            </select>
+            <input type="text" id="user-input" placeholder="Enter PPT topic or question">
+            <input type="file" id="user-input-file" accept=".pdf">
+            <button onclick="handleAction()">Submit</button>
+        </div>
+        <button onclick="generateMCQ()" disabled id="mcq-button">Generate MCQs</button>
+    </div>
+
+    <script>
+        const chatOutput = document.getElementById('chat-output');
+        const actionSelect = document.getElementById('action-select');
+        const userInputText = document.getElementById('user-input');
+        const userInputFile = document.getElementById('user-input-file');
+        const mcqButton = document.getElementById('mcq-button');
+        let documentUploaded = false;
+
+        function addMessage(text, sender) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${sender}`;
+            msgDiv.textContent = text;
+            chatOutput.appendChild(msgDiv);
+            chatOutput.scrollTop = chatOutput.scrollHeight;
+        }
+
+        function toggleInputType() {
+            const action = actionSelect.value;
+            if (action === 'upload') {
+                userInputText.style.display = 'none';
+                userInputFile.style.display = 'block';
+                userInputText.value = '';
+            } else {
+                userInputText.style.display = 'block';
+                userInputFile.style.display = 'none';
+                userInputFile.value = '';
+                userInputText.placeholder = action === 'ppt' ? 'Enter PPT topic' : 'Ask a question';
+            }
+        }
+
+        function enableActions() {
+            documentUploaded = true;
+            mcqButton.disabled = false;
+            actionSelect.options[1].disabled = false; // Enable Create PPT
+            actionSelect.options[2].disabled = false; // Enable Ask Doubt
+        }
+
+        async function handleAction() {
+            console.log("Submit button clicked, action:", actionSelect.value);
+            const action = actionSelect.value;
+
+            if (action === 'upload') {
+                await uploadPDF();
+            } else if (action === 'ppt') {
+                await createPPT();
+            } else if (action === 'doubt') {
+                await askDoubt();
+            }
+        }
+
+        async function uploadPDF() {
+            const fileInput = userInputFile;
+            if (!fileInput.files[0]) {
+                addMessage('Please select a PDF file.', 'bot');
+                return;
+            }
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            const response = await fetch('/upload_pdf', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            addMessage(data.message, 'bot');
+            if (data.status === 'success') {
+                enableActions();
+                data.study_plan.forEach(item => addMessage(item, 'bot')); // Fixed typo in previous step
+            } else {
+                documentUploaded = false;
+            }
+            userInputFile.value = ''; // Clear file input
+        }
+
+        async function generateMCQ() {
+            if (!documentUploaded) {
+                addMessage('Please upload a PDF first.', 'bot');
+                return;
+            }
+            const response = await fetch('/generate_mcq');
+            const data = await response.json();
+            addMessage(data.message, 'bot');
+            if (data.status === 'success') {
+                data.questions.forEach(q => {
+                    addMessage(q.question, 'bot');
+                    q.options.forEach((opt, i) => addMessage(`${i + 1}. ${opt}`, 'bot'));
+                    addMessage(`Correct Answer: ${q.correct}`, 'bot');
+                });
+            }
+        }
+
+        async function createPPT() {
+            console.log("Creating PPT with topic:", userInputText.value);
+            if (!documentUploaded) {
+                addMessage('Please upload a PDF first.', 'bot');
+                return;
+            }
+            const topic = userInputText.value.trim();
+            if (!topic) {
+                addMessage('Please enter a topic.', 'bot');
+                return;
+            }
+            const response = await fetch('/create_ppt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ topic })
+            });
+            const data = await response.json();
+            addMessage(data.message, 'bot');
+            if (data.status === 'success') {
+                const link = document.createElement('a');
+                link.href = `data:application/vnd.openxmlformats-officedocument.presentationml.presentation;base64,${data.ppt_data}`;
+                link.download = `${topic}_presentation.pptx`;
+                link.click();
+            }
+            userInputText.value = ''; // Clear input
+        }
+
+        async function askDoubt() {
+            console.log("Asking doubt:", userInputText.value);
+            if (!documentUploaded) {
+                addMessage('Please upload a PDF first.', 'bot');
+                return;
+            }
+            const question = userInputText.value.trim();
+            if (!question) {
+                addMessage('Please enter a question.', 'bot');
+                return;
+            }
+            addMessage(question, 'user');
+            const response = await fetch('/clarify_doubt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question })
+            });
+            const data = await response.json();
+            addMessage(data.message, 'bot');
+            userInputText.value = ''; // Clear input
+        }
+
+        // Initialize input type on page load
+        toggleInputType();
+    </script>
+</body>
+</html> --> 
+
+<!-- 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Professor Bot</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f0f0f0; }
+        #chat-container { max-width: 600px; margin: auto; border: 1px solid #ccc; padding: 20px; background: white; border-radius: 10px; }
+        #chat-output { height: 400px; overflow-y: scroll; border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; }
+        .message { margin: 5px 0; padding: 10px; border-radius: 5px; }
+        .user { background-color: #e6f3ff; text-align: right; }
+        .bot { background-color: #f0fff0; }
+        #input-container { display: flex; align-items: center; margin: 5px 0; }
+        #action-select { margin-right: 10px; padding: 8px; }
+        #user-input { flex-grow: 1; padding: 8px; }
+        #user-input-file { flex-grow: 1; padding: 8px; display: none; }
+        button { margin: 5px; padding: 8px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background-color: #45a049; }
+        button:disabled { background-color: #cccccc; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <div id="chat-container">
+        <h2>Professor Bot</h2>
+        <div id="chat-output">
+            <div class="message bot">Please select an action and provide input to get started (e.g., upload a PDF, create a PPT, or ask a doubt).</div>
+        </div>
+        <div id="input-container">
+            <select id="action-select" onchange="toggleInputType()">
+                <option value="upload">Upload PDF</option>
+                <option value="ppt">Create PPT</option>
+                <option value="doubt">Ask Doubt</option>
+            </select>
+            <input type="text" id="user-input" placeholder="Enter PPT topic or question">
+            <input type="file" id="user-input-file" accept=".pdf">
+            <button onclick="handleAction()">Submit</button>
+        </div>
+        <button onclick="generateMCQ()" id="mcq-button">Generate MCQs</button>
+    </div>
+
+    <script>
+        const chatOutput = document.getElementById('chat-output');
+        const actionSelect = document.getElementById('action-select');
+        const userInputText = document.getElementById('user-input');
+        const userInputFile = document.getElementById('user-input-file');
+        const mcqButton = document.getElementById('mcq-button');
+        let documentUploaded = false;
+
+        function addMessage(text, sender) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${sender}`;
+            msgDiv.textContent = text;
+            chatOutput.appendChild(msgDiv);
+            chatOutput.scrollTop = chatOutput.scrollHeight;
+        }
+
+        function toggleInputType() {
+            const action = actionSelect.value;
+            if (action === 'upload') {
+                userInputText.style.display = 'none';
+                userInputFile.style.display = 'block';
+                userInputText.value = '';
+            } else {
+                userInputText.style.display = 'block';
+                userInputFile.style.display = 'none';
+                userInputFile.value = '';
+                userInputText.placeholder = action === 'ppt' ? 'Enter PPT topic' : 'Ask a question';
+            }
+        }
+
+        function enableActions() {
+            documentUploaded = true;
+        }
+
+        async function handleAction() {
+            console.log("Submit button clicked, action:", actionSelect.value);
+            const action = actionSelect.value;
+
+            if (action === 'upload') {
+                await uploadPDF();
+            } else if (action === 'ppt') {
+                await createPPT();
+            } else if (action === 'doubt') {
+                await askDoubt();
+            }
+        }
+
+        async function uploadPDF() {
+            const fileInput = userInputFile;
+            if (!fileInput.files[0]) {
+                addMessage('Please select a PDF file.', 'bot');
+                return;
+            }
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            const response = await fetch('/upload_pdf', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            addMessage(data.message, 'bot');
+            if (data.status === 'success') {
+                enableActions();
+                data.study_plan.forEach(item => addMessage(item, 'bot'));
+            } else {
+                documentUploaded = false;
+            }
+            userInputFile.value = '';
+        }
+
+        async function generateMCQ() {
+            if (!documentUploaded) {
+                addMessage('Please upload a PDF first.', 'bot');
+                return;
+            }
+            const response = await fetch('/generate_mcq');
+            const data = await response.json();
+            addMessage(data.message, 'bot');
+            if (data.status === 'success') {
+                data.questions.forEach(q => {
+                    addMessage(q.question, 'bot');
+                    q.options.forEach((opt, i) => addMessage(`${i + 1}. ${opt}`, 'bot'));
+                    addMessage(`Correct Answer: ${q.correct}`, 'bot');
+                });
+            }
+        }
+
+        async function createPPT() {
+            console.log("Creating PPT with topic:", userInputText.value);
+            if (!documentUploaded) {
+                addMessage('Please upload a PDF first.', 'bot');
+                return;
+            }
+            const topic = userInputText.value.trim();
+            if (!topic) {
+                addMessage('Please enter a topic.', 'bot');
+                return;
+            }
+            const response = await fetch('/create_ppt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ topic })
+            });
+            const data = await response.json();
+            addMessage(data.message, 'bot');
+            if (data.status === 'success') {
+                const link = document.createElement('a');
+                link.href = `data:application/vnd.openxmlformats-officedocument.presentationml.presentation;base64,${data.ppt_data}`;
+                link.download = `${topic}_presentation.pptx`;
+                link.click();
+            }
+            userInputText.value = '';
+        }
+
+        async function askDoubt() {
+            console.log("Asking doubt:", userInputText.value);
+            if (!documentUploaded) {
+                addMessage('Please upload a PDF first.', 'bot');
+                return;
+            }
+            const question = userInputText.value.trim();
+            if (!question) {
+                addMessage('Please enter a question.', 'bot');
+                return;
+            }
+            addMessage(question, 'user');
+            const response = await fetch('/clarify_doubt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question })
+            });
+            const data = await response.json();
+            addMessage(data.message, 'bot');
+            userInputText.value = '';
+        }
+
+        // Initialize input type on page load
+        toggleInputType();
+    </script>
+</body>
+</html>  -->
+
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Professor Bot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            width: 80%;
+            margin: auto;
+            overflow: hidden;
+            padding: 20px;
+        }
+        #chat {
+            background: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            height: 400px;
+            overflow-y: scroll;
+        }
+        #chat .message {
+            margin: 10px 0;
+        }
+        #chat .user {
+            color: #007bff;
+            font-weight: bold;
+        }
+        #chat .bot {
+            color: #333;
+        }
+        .input-group {
+            margin: 10px 0;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .input-group input, .input-group button {
+            padding: 10px;
+            font-size: 16px;
+        }
+        .input-group input[type="text"] {
+            width: 80%;
+            margin-right: 10px;
+        }
+        .btn {
+            background: #007bff;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .btn:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Professor Bot</h1>
+        <div id="chat"></div>
+        <div class="input-group">
+            <label for="pdfInput">Upload PDF:</label>
+            <input type="file" id="pdfInput" accept=".pdf">
+            <button id="uploadBtn" class="btn">Upload PDF</button>
+        </div>
+        <div class="input-group">
+            <button id="generateMcqBtn" class="btn">Generate MCQ</button>
+            <button id="generatePptBtn" class="btn">Generate PPT</button>
+        </div>
+        <div class="input-group">
+            <label for="questionInput">Ask a question:</label>
+            <input type="text" id="questionInput" placeholder="Type your question here">
+            <button id="askBtn" class="btn">Ask</button>
+        </div>
+    </div>
+
+    <script>
+        const chat = document.getElementById('chat');
+
+        function appendMessage(sender, message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            if (Array.isArray(message)) {
+                message.forEach(line => {
+                    const lineDiv = document.createElement('div');
+                    lineDiv.textContent = line;
+                    messageDiv.appendChild(lineDiv);
+                });
+            } else {
+                messageDiv.textContent = message;
+            }
+            chat.appendChild(messageDiv);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        document.getElementById('uploadBtn').addEventListener('click', function() {
+            const fileInput = document.getElementById('pdfInput');
+            const file = fileInput.files[0];
+            if (!file) {
+                appendMessage('bot', 'Please select a PDF file to upload.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            appendMessage('user', 'Uploading PDF...');
+            fetch('/upload_pdf', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    appendMessage('bot', data.message);
+                    appendMessage('bot', 'Study Plan:');
+                    data.study_plan.forEach(line => appendMessage('bot', line));
+                    appendMessage('bot', 'Syllabus:');
+                    data.syllabus.forEach(line => appendMessage('bot', line));
+                } else {
+                    appendMessage('bot', 'Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                appendMessage('bot', 'Error uploading PDF: ' + error);
+            });
+        });
+
+        document.getElementById('generateMcqBtn').addEventListener('click', function() {
+            fetch('/generate_mcq', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    appendMessage('bot', data.message);
+                } else {
+                    appendMessage('bot', 'Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                appendMessage('bot', 'Error generating MCQ: ' + error);
+            });
+        });
+
+        document.getElementById('generatePptBtn').addEventListener('click', function() {
+            fetch('/generate_ppt', {  // Ensure this matches the backend route
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    appendMessage('bot', data.message);
+                } else {
+                    appendMessage('bot', 'Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                appendMessage('bot', 'Error generating PPT: ' + error);
+            });
+        });
+
+        document.getElementById('askBtn').addEventListener('click', function() {
+            const questionInput = document.getElementById('questionInput');
+            const question = questionInput.value.trim();
+            if (!question) {
+                appendMessage('bot', 'Please enter a question.');
+                return;
+            }
+
+            appendMessage('user', 'Question: ' + question);
+            const formData = new FormData();
+            formData.append('question', question);
+
+            fetch('/clarify_doubt', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    appendMessage('bot', data.message);
+                } else {
+                    appendMessage('bot', 'Error: ' + data.message);
+                }
+                questionInput.value = '';
+            })
+            .catch(error => {
+                appendMessage('bot', 'Error asking question: ' + error);
+            });
+        });
+    </script>
+</body>
+</html>  -->
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Professor Bot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            width: 80%;
+            margin: auto;
+            overflow: hidden;
+            padding: 20px;
+        }
+        #chat {
+            background: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            height: 400px;
+            overflow-y: scroll;
+        }
+        #chat .message {
+            margin: 10px 0;
+        }
+        #chat .user {
+            color: #007bff;
+            font-weight: bold;
+        }
+        #chat .bot {
+            color: #333;
+        }
+        .input-group {
+            margin: 10px 0;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .input-group input, .input-group button {
+            padding: 10px;
+            font-size: 16px;
+        }
+        .input-group input[type="text"] {
+            width: 80%;
+            margin-right: 10px;
+        }
+        .btn {
+            background: #007bff;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .btn:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Professor Bot</h1>
+        <div id="chat"></div>
+        <div class="input-group">
+            <label for="pdfInput">Upload PDF:</label>
+            <input type="file" id="pdfInput" accept=".pdf">
+            <button id="uploadBtn" class="btn">Upload PDF</button>
+        </div>
+        <div class="input-group">
+            <button id="generateMcqBtn" class="btn">Generate MCQ</button>
+            <button id="generatePptBtn" class="btn">Generate PPT (Text)</button>
+            <button id="downloadPptBtn" class="btn">Download PPT</button>
+        </div>
+        <div class="input-group">
+            <label for="questionInput">Ask a question:</label>
+            <input type="text" id="questionInput" placeholder="Type your question here">
+            <button id="askBtn" class="btn">Ask</button>
+        </div>
+    </div>
+
+    <script>
+        const chat = document.getElementById('chat');
+
+        function appendMessage(sender, message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            if (Array.isArray(message)) {
+                message.forEach(line => {
+                    const lineDiv = document.createElement('div');
+                    lineDiv.textContent = line;
+                    messageDiv.appendChild(lineDiv);
+                });
+            } else {
+                messageDiv.textContent = message;
+            }
+            chat.appendChild(messageDiv);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        document.getElementById('uploadBtn').addEventListener('click', function() {
+            const fileInput = document.getElementById('pdfInput');
+            const file = fileInput.files[0];
+            if (!file) {
+                appendMessage('bot', 'Please select a PDF file to upload.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            appendMessage('user', 'Uploading PDF...');
+            fetch('/upload_pdf', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        throw new Error(`Server error: ${response.status} - ${text}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'success') {
+                    appendMessage('bot', data.message);
+                    appendMessage('bot', 'Study Plan:');
+                    data.study_plan.forEach(line => appendMessage('bot', line));
+                    appendMessage('bot', 'Syllabus:');
+                    data.syllabus.forEach(line => appendMessage('bot', line));
+                } else {
+                    appendMessage('bot', 'Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                appendMessage('bot', 'Error uploading PDF: ' + error.message);
+            });
+        });
+
+        document.getElementById('generateMcqBtn').addEventListener('click', function() {
+            fetch('/generate_mcq', {
+                method: 'POST'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        throw new Error(`Server error: ${response.status} - ${text}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'success') {
+                    appendMessage('bot', data.message);
+                    data.questions.forEach(q => {
+                        appendMessage('bot', q.question);
+                        q.options.forEach(opt => appendMessage('bot', `- ${opt}`));
+                        appendMessage('bot', `Correct Answer: ${q.correct}`);
+                    });
+                    appendMessage('bot', 'Syllabus:');
+                    data.syllabus.forEach(line => appendMessage('bot', line));
+                } else {
+                    appendMessage('bot', 'Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                appendMessage('bot', 'Error generating MCQ: ' + error.message);
+            });
+        });
+
+        document.getElementById('generatePptBtn').addEventListener('click', function() {
+            fetch('/generate_ppt', {
+                method: 'POST'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        throw new Error(`Server error: ${response.status} - ${text}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'success') {
+                    appendMessage('bot', data.message);
+                } else {
+                    appendMessage('bot', 'Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                appendMessage('bot', 'Error generating PPT: ' + error.message);
+            });
+        });
+
+        document.getElementById('downloadPptBtn').addEventListener('click', function() {
+            fetch('/download_ppt', {
+                method: 'POST'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        throw new Error(data.message);
+                    });
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = 'Python_Data_Science_Presentation.pptx';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                appendMessage('bot', 'PPT downloaded successfully.');
+            })
+            .catch(error => {
+                appendMessage('bot', 'Error downloading PPT: ' + error.message);
+            });
+        });
+
+        document.getElementById('askBtn').addEventListener('click', function() {
+            const questionInput = document.getElementById('questionInput');
+            const question = questionInput.value.trim();
+            if (!question) {
+                appendMessage('bot', 'Please enter a question.');
+                return;
+            }
+
+            appendMessage('user', 'Question: ' + question);
+            fetch('/clarify_doubt', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ question: question, response_type: 'short' })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        throw new Error(`Server error: ${response.status} - ${text}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'success') {
+                    appendMessage('bot', data.message);
+                } else {
+                    appendMessage('bot', 'Error: ' + data.message);
+                }
+                questionInput.value = '';
+            })
+            .catch(error => {
+                appendMessage('bot', 'Error asking question: ' + error.message);
+            });
+        });
+    </script>
+</body>
+</html>
