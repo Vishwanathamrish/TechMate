@@ -103,14 +103,19 @@ Click "Download PPT" to download a PowerPoint presentation based on the PDF.
 
 Enter a question in the input field and click "Ask" to get a response.
 
-- Project Structure 📂
+---
+
+## Project Structure 📂
+
 - professor-bot/
 - │
-- ├── professor.py        # Main Flask application script
-- ├── index.html          # Frontend HTML template
-- ├── venv/               # Virtual environment directory
-- ├── nltk_data/          # NLTK data directory
-- └── README.md           # This README file
+- ├── professor.py          # Main Flask application script
+- ├── venv/                 # Virtual environment directory
+- ├── Templates   
+-   ├── index.html          # Frontend HTML template
+-   ├── login.html          # Create a new User
+-   ├── register.html       # Existing user to login
+
 
 --- 
 
