@@ -79,7 +79,7 @@ def load_user(user_id):
         return None
 
 # Configure Gemini API
-GEMINI_API_KEY = "AIzaSyDgtWrBsWrPN6rx7OXX_F8YiRHK5s62zjE"  # Replace with your Gemini API key
+GEMINI_API_KEY = "your-secret-key"  # Replace with your Gemini API key
 try:
     genai.configure(api_key=GEMINI_API_KEY)
 except Exception as e:
