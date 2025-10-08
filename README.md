@@ -177,8 +177,7 @@ Enter a question in the input field and click "Ask" to get a response.
 - Push to the branch: git push origin feature-name.
 - Open a pull request.
 
-## License 📜
-- This project is licensed under the MIT License. See the LICENSE file for details.
+
 ## Contact 📧
 - For questions or support, reach out to:
 
