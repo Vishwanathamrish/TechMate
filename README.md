@@ -1,11 +1,11 @@
 # Professor Bot 🤖 
 
-**Professor Bot** is a web-based application designed to assist students by generating study plans, syllabi, multiple-choice questions (MCQs), PowerPoint presentations (PPTs), and answering questions based on uploaded PDF documents. It leverages natural language processing (NLP) with NLTK and AI with Google's Gemini API to process and analyze PDF content, making it a powerful educational tool.
+**Professor Bot** is an AI-powered web application built with Flask that assists students and educators by intelligently extracting and analyzing text from PDF documents. It leverages Natural Language Processing (NLP) and Groq AI to generate comprehensive study plans, syllabi, multiple-choice questions (MCQs), and PowerPoint presentations. Additionally, it supports optional Qdrant integration for efficient semantic storage and retrieval, making it a powerful and adaptive educational companion.
 
 ---
 
 ## Overview 📚
-Professor Bot helps students by automating educational tasks such as creating study plans, generating MCQs, and producing PPTs from uploaded PDFs. Built with Flask, it uses NLTK for text processing and the Gemini API for advanced content generation. The application is ideal for students and educators looking to streamline study material preparation.
+Professor Bot helps students by automating educational tasks such as creating study plans, generating MCQs, and producing PPTs from uploaded PDFs. Built with Flask, it uses NLTK for text processing and the Groq AI for advanced content generation. The application is ideal for students and educators looking to streamline study material preparation.
 
 ---
 
@@ -13,7 +13,7 @@ Professor Bot helps students by automating educational tasks such as creating st
 
 - 📄 PDF Upload:Extract text from uploaded PDF documents.
 - 📅 Study Plan Generation: Automatically creates a study plan based on key PDF topics.
-- 📋 Syllabus Generation: Uses Gemini API to generate a detailed syllabus.
+- 📋 Syllabus Generation: Uses Groq AI to generate a detailed syllabus.
 - ❓ MCQ Generation: Creates MCQs by identifying key nouns in the PDF.
 - 📊 PPT Generation: Generates PowerPoint slides based on PDF content.
 - 💬 Question Clarification: Answers student queries using PDF and syllabus context.
@@ -49,11 +49,39 @@ source venv/bin/activate
 3. Install Dependencies
 pip install flask PyPDF2 nltk python-pptx qdrant-client google-generativeai
 
-4. Configure the Gemini API Key
-Edit professor.py to add your Gemini API key:
-GEMINI_API_KEY = "your-gemini-api-key"
 
-Get your key from Google AI Studio.
+
+4. Configure the Groq API Key
+
+This project uses Groq as the primary AI provider. Configure your Groq credentials via environment variables (recommended) or directly in the app config.
+
+- PowerShell (current session):
+```powershell
+$env:AI_PROVIDER = "groq"
+$env:GROQ_API_KEY = "your-groq-api-key"
+```
+
+- PowerShell (persist across sessions — requires opening a new shell):
+```powershell
+setx AI_PROVIDER "groq"
+setx GROQ_API_KEY "your-groq-api-key"
+```
+
+- Alternatively, set the variables in your system environment settings or a .env file and load them in your app.
+
+In code (example snippet to place in professor.py or your config module):
+```python
+AI_PROVIDER = os.getenv("AI_PROVIDER", "groq")  # 'groq' or 'gemini'
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+# Optional backward-compatibility if you still keep a Gemini key
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+```
+
+Notes:
+- Obtain your Groq API key from your Groq account / developer dashboard.
+- Never commit API keys to source control. Use environment variables or a secrets manager.
+- If you are migrating from Gemini: set AI_PROVIDER="groq" and implement/enable a Groq adapter (see "Migrating from Gemini to Groq" section). Keep prompt and response parsing inside the adapter to avoid touching the rest of the codebase.
+``` 
 
 5. Download NLTK Data
 The application requires punkt and averaged_perceptron_tagger_eng. Run this script to download them:
@@ -123,7 +151,7 @@ Enter a question in the input field and click "Ask" to get a response.
 
 - read_pdf(file_stream): Extracts text from PDFs.
 - generate_study_plan(text): Creates a study plan from frequent terms.
-- generate_syllabus_with_gemini(text): Generates a syllabus using Gemini API.
+- generate_syllabus_with_groq(text): Generates a syllabus using Groq API.
 - generate_mcq(text): Generates MCQs using NLTK.
 - create_ppt_from_slides(): Creates PPT slides from PDF content.
 - clarify_doubts_with_rag(question, document_id, response_type): Answers queries.
@@ -138,7 +166,7 @@ Enter a question in the input field and click "Ask" to get a response.
 - Verify write permissions for C:\Users\<your-username>\nltk_data.
 - Run the NLTK download script from the "Installation" section.
 
-## Gemini API Errors
+## Groq API Errors
 
 - Verify your API key in professor.py.
 - Check internet connectivity and API rate limits.
@@ -157,7 +185,7 @@ Enter a question in the input field and click "Ask" to get a response.
 - Requires text-based PDFs with sufficient content.
 - Qdrant integration is bypassed due to Docker issues.
 - MCQ generation depends on nouns in the PDF.
-- Gemini API requires internet and a valid key.
+- Groq API requires internet and a valid key.
 ---
 
 ## Future Improvements 🔮
