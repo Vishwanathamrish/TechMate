@@ -81,7 +81,8 @@ Notes:
 - Obtain your Groq API key from your Groq account / developer dashboard.
 - Never commit API keys to source control. Use environment variables or a secrets manager.
 - If you are migrating from Gemini: set AI_PROVIDER="groq" and implement/enable a Groq adapter (see "Migrating from Gemini to Groq" section). Keep prompt and response parsing inside the adapter to avoid touching the rest of the codebase.
-``` 
+
+---
 
 5. Download NLTK Data
 The application requires punkt and averaged_perceptron_tagger_eng. Run this script to download them:
